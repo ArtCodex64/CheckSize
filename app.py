@@ -3,15 +3,19 @@ import subprocess
 import os
 import re
 import math
+import pandas as pd
+from os.path import join, getsize
 from xml.dom.expatbuilder import parseString
 from PyQt5.QtWidgets import (
     QMainWindow, QApplication, QWidget, 
     QLabel, QToolBar, QStatusBar, QPushButton, QGridLayout, QAction,
-    QComboBox
+    QComboBox, QTableWidget, QTableWidgetItem, QTableView, QHeaderView
 )
 from PyQt5.QtGui import QIcon
 from PyQt5 import QtGui, QtCore
+from PyQt5.QtCore import QAbstractTableModel, Qt
 from PyQt5.QtGui import QCursor
+from modules.pandasModel import pandasModel
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -33,7 +37,8 @@ class MainWindow(QMainWindow):
         )
         lsUnits = menu.addMenu("&Archivos")
         lsUnits.addAction(button_units)
-        self.resize(840, 600)
+        self.resize(1020, 600)
+        self.showMaximized()
 
     def unidadesLogicas(self):
         window = QWidget()
@@ -63,7 +68,7 @@ class MainWindow(QMainWindow):
                     "background-color: #dcff97;" + 
                     "}"
                 )
-                buttonUn.clicked.connect(lambda uniGood=uniGood: self.infoUnidades(uniGood))
+                buttonUn.clicked.connect(lambda _, uniGood=uniGood: self.infoUnidades(uniGood))
                 layoutUnits.addWidget(buttonUn, e, i)
                 i += 1
                 if(i == 5):
@@ -80,39 +85,63 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(window)
 
     def infoUnidades(self, unidad):
-        print(unidad)
         free = subprocess.getoutput('fsutil volume diskfree %s' % unidad)
-        label = QLabel(free)
+        uniEx = re.findall(r"\d*\,\d*", free)
+        tmUni = uniEx[1]
+        tmUni = tmUni.replace(",",".")
+        tmUni = float(tmUni)
+        tmLib = uniEx[0]
+        tmLibf = tmLib.replace(",",".")
+        tmLibf = float(tmLibf)
+        txt = tmUni - tmLibf
+        
+        info = "Espacio utilizado: %.2f" % txt + " GB | "
+        info = info + "Tamaño unidad: %.2f" % tmUni + " GB | "
+        info = info + "Espacio libre: %.2f" % tmLibf + " GB "
+        label = QLabel(info)
+        label.setStyleSheet(
+            "color:  #9fef00; " +
+            "font-size: 12px; " +
+            "width: 100%; " +
+            "height: auto; "
+        )
+        dirs, ndirs = self.getSize(unidad)
+        df = pd.DataFrame(dirs, columns = ['DIR', 'SIZE(Bytes)','NUMBER OF FILES'])
+        dfSort = df.sort_values(by=['SIZE(Bytes)'], ascending=False)
+        model = pandasModel(dfSort)
+        view = QTableView()
+        view
+        view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        view.setModel(model)
+        view.setStyleSheet(
+            "background-color: #ffffff;"+
+            "color: #000000; "
+        )
         window = QWidget()
         layout = QGridLayout()
         layout.addWidget(label, 0, 0)
+        layout.addWidget(view, 1, 0)
         window.setLayout(layout)
         self.setCentralWidget(window)
-        #uniEx = re.findall(r"\d*\,\d*", free)
-        #tmUni = uniEx[0]
-        #tmUni = tmUni.replace(",",".")
-        #tmUni = float(tmUni)
-        #tmLib = uniEx[1]
-        #tmLibf = tmLib.replace(",",".")
-        #tmLibf = float(tmLibf)
-        #txt = tmUni - tmLibf
-        #print(
-        #    "Espacio utilizado: %.2f" % txt + " GB \n" +
-        #    "Tamaño unidad: %.2f" % tmUni + " GB \n" +
-        #    "Espacio libre: %.2f" % tmLibf + " GB \n"  
-        #)
 
-
-        
-
-        
+    def getSize(self, start_path):
+        data = []
+        numDirs = 0
+        for root, dirs, files in os.walk(start_path):
+            dirs = root
+            sizes = sum(getsize(join(root, name)) for name in files)
+            numFiles = len(files)
+            data += [[dirs, sizes, numFiles]]
+            numDirs += 1
+        return data, numDirs
+            
 
 
 
 app = QApplication(sys.argv)
 w = MainWindow()
 w.setStyleSheet(
-    "background-color: #1A2332;;"
+    "background-color: #1A2332;"
 )
 w.show()
 app.exec_()
