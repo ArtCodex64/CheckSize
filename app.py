@@ -48,11 +48,12 @@ class MainWindow(QMainWindow):
             unidades = storage.split(" ")
             unidades.pop(0)
             unidades.pop(-1)
-            unidades.append("Z:/")
-            unidades.append("Y:/")
-            unidades.append("A:/")
-            unidades.append("B:/")
-            unidades.append("D:/")
+            #Simulación de Unidades de almacenamiento
+            #unidades.append("Z:/")
+            #unidades.append("Y:/")
+            #unidades.append("A:/")
+            #unidades.append("B:/")
+            #unidades.append("D:/")
             num = math.ceil(len(unidades)/ 5)
             e = 0
             i = 0
