@@ -10,15 +10,16 @@ from PyQt5.QtWidgets import (
     QMainWindow, QApplication, QWidget, 
     QLabel, QStatusBar, QPushButton, QGridLayout, QAction,
     QTableView, QHeaderView,
-    QHBoxLayout
+    QHBoxLayout, QVBoxLayout, QScrollArea
 )
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QPalette
 from modules.pandasModel import pandasModel
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
-
+        self.scrollArea = QScrollArea()
+        self.scrollArea.setBackgroundRole(QPalette.Dark)
         self.setWindowTitle("Check Size")
         self.setWindowIcon(QIcon("icons/py-file-icon.png"))
 
@@ -75,16 +76,18 @@ class MainWindow(QMainWindow):
             unidad = storage.split(" ")
 
         window.setLayout(layoutUnits)
-        self.setCentralWidget(window)
+        self.scrollArea.setWidget(window)
+        self.setCentralWidget(self.scrollArea)
 
     def showDF(self, pathDF):
         windowDF = QWidget()
-        layoutUnitsDF = QGridLayout()
+        layoutUnitsDF = QVBoxLayout()
         dirs = self.lsDirsFiles(pathDF)
         buttonCalculate = QPushButton(QIcon("icons/calculator.png"), "Calcular")
         buttonCalculate.setStyleSheet(
             "background-color: red" +
-            "color: white"
+            "color: white" +
+            "text-align: left; "
         )
         buttonCalculate.clicked.connect(lambda _, pathDF=pathDF: self.infoUnidades(pathDF))
         layoutUnitsDF.addWidget(buttonCalculate)
@@ -98,10 +101,11 @@ class MainWindow(QMainWindow):
                     "*{" + 
                     "padding: 5px 12px;" + 
                     "background-color: #141D2B;" + 
-                    "color: #9fef00;}" +
+                    "color: #9fef00;" +
+                    "text-align: left; }" + 
                     "*:hover{" +
                     "background-color: #dcff97;" +
-                    "color: #000000;"
+                    "color: #000000;" +
                     "}"
                 )
                 buttonUn.clicked.connect(lambda _, x=x:self.showDF(x))
@@ -112,30 +116,24 @@ class MainWindow(QMainWindow):
                     "*{" + 
                     "padding: 5px 12px;" + 
                     "background-color: #141D2B;" + 
-                    "color: #9fef00;}" +
+                    "color: #9fef00; " +
+                    "text-align: left; }" + 
                     "*:hover{" +
                     "background-color: #dcff97;" + 
-                    "color: #000000; "
+                    "color: #000000; " +
                     "}"
                 )
                 buttonUn.clicked.connect(lambda _, x=x: self.infoUnidades(x))
                 arrayFiles.append(buttonUn)
-        ei = 0
-        ie = 0
         for x in arrayDirs:
-            layoutUnitsDF.addWidget(x, ei, ie)
-            ie += 1
-            if(ie == 5):
-                ei += 1
-                ie = 0
+            layoutUnitsDF.addWidget(x)
+
         for x in arrayFiles:
-            layoutUnitsDF.addWidget(x, ei, ie)
-            ie += 1
-            if(ie == 5):
-                ei += 1
-                ie = 0
+            layoutUnitsDF.addWidget(x)
+
         windowDF.setLayout(layoutUnitsDF)
-        self.setCentralWidget(windowDF)
+        self.scrollArea.setWidget(windowDF)
+        self.setCentralWidget(self.scrollArea)
     
     def infoUnidades(self, unidad):
         free = subprocess.getoutput('fsutil volume diskfree %s' % unidad)
