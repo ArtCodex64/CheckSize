@@ -3,7 +3,9 @@ import subprocess
 import os
 import re
 import math
+import threading
 import pandas as pd
+from pathlib import Path
 from os.path import join, getsize, abspath
 from os import scandir
 from PyQt5.QtWidgets import (
@@ -14,6 +16,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QIcon, QPalette
 from modules.pandasModel import pandasModel
+from modules.hilos import HiloGetSizeDirs, HiloGetSizeFile
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -34,12 +37,15 @@ class MainWindow(QMainWindow):
             "background-color: #ffffff;" + 
             "color: #000000;"
         )
+        
+
         lsUnits = menu.addMenu("&Archivos")
         lsUnits.addAction(button_units)
         self.resize(1020, 600)
         self.showMaximized()
 
     def unidadesLogicas(self):
+        
         window = QWidget()
         layoutUnits = QGridLayout()
         if 'win' in sys.platform:
@@ -80,15 +86,32 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.scrollArea)
 
     def showDF(self, pathDF):
+        
         windowDF = QWidget()
         layoutUnitsDF = QVBoxLayout()
+        layoutUnitsH = QHBoxLayout()
         dirs = self.lsDirsFiles(pathDF)
+        numDirs = 0
+        numFiles = 0
+        for x in dirs:
+            if os.path.isdir(x):
+                numDirs += 1
+        for x in dirs:
+            if os.path.isfile(x):
+                numFiles += 1
+        
         buttonCalculate = QPushButton(QIcon("icons/calculator.png"), "Calcular")
         buttonCalculate.setStyleSheet(
-            "background-color: red" +
-            "color: white" +
-            "text-align: left; "
-        )
+                    "*{" + 
+                    "padding: 5px 12px;" + 
+                    "background-color: #9b2f4d;" + 
+                    "color: #ffffff;" +
+                    "text-align: left; }" + 
+                    "*:hover{" +
+                    "background-color: #f31451;" +
+                    "color: #000000;" +
+                    "}"
+                )
         buttonCalculate.clicked.connect(lambda _, pathDF=pathDF: self.infoUnidades(pathDF))
         layoutUnitsDF.addWidget(buttonCalculate)
 
@@ -96,7 +119,10 @@ class MainWindow(QMainWindow):
         arrayFiles = []
         for x in dirs:
             if os.path.isdir(x):
-                buttonUn = QPushButton(QIcon("icons/folder.png"), x)
+                sizeDir = self.getSizeDirs(x)
+                sizeFormat = self.getSizeFormat(sizeDir)
+                label = QLabel(sizeFormat)
+                buttonUn = QPushButton(QIcon("icons/folder-red.png"), x)
                 buttonUn.setStyleSheet(
                     "*{" + 
                     "padding: 5px 12px;" + 
@@ -109,9 +135,12 @@ class MainWindow(QMainWindow):
                     "}"
                 )
                 buttonUn.clicked.connect(lambda _, x=x:self.showDF(x))
-                arrayDirs.append(buttonUn)
+                arrayDirs.append([buttonUn, label])
             elif os.path.isfile(x):
-                buttonUn = QPushButton(QIcon("icons/file.png"), x)
+                sizeFile = self.getSizeFile(x)
+                sizeFormat = self.getSizeFormat(sizeFile)
+                label = QLabel(str(sizeFormat))
+                buttonUn = QPushButton(QIcon("icons/file-red.png"), x)
                 buttonUn.setStyleSheet(
                     "*{" + 
                     "padding: 5px 12px;" + 
@@ -124,13 +153,21 @@ class MainWindow(QMainWindow):
                     "}"
                 )
                 buttonUn.clicked.connect(lambda _, x=x: self.infoUnidades(x))
-                arrayFiles.append(buttonUn)
+                arrayFiles.append([buttonUn, label])
+
         for x in arrayDirs:
-            layoutUnitsDF.addWidget(x)
+            layoutUnitsH = QHBoxLayout()
+            layoutUnitsH.addWidget(x[0])
+            layoutUnitsH.addWidget(x[1])
+            layoutUnitsDF.addLayout(layoutUnitsH)
 
         for x in arrayFiles:
-            layoutUnitsDF.addWidget(x)
+            layoutUnitsH = QHBoxLayout()
+            layoutUnitsH.addWidget(x[0])
+            layoutUnitsH.addWidget(x[1])
+            layoutUnitsDF.addLayout(layoutUnitsH)
 
+        
         windowDF.setLayout(layoutUnitsDF)
         self.scrollArea.setWidget(windowDF)
         self.setCentralWidget(self.scrollArea)
@@ -187,9 +224,34 @@ class MainWindow(QMainWindow):
             data += [[dirs, sizes, numFiles]]
             numDirs += 1
         return data, numDirs
-            
-
-
+    def getSizeDirs(self, directory):
+        total = 0
+        try:
+            for entry in os.scandir(directory):
+                if entry.is_file():
+                    total += entry.stat().st_size
+                elif entry.is_dir():
+                    total += self.getSizeDirs(entry.path)
+        except NotADirectoryError:
+            return os.path.getsize(directory)
+        except PermissionError:
+            return 0
+        return total
+    def getSizeFile(self, file):
+        total = 0
+        try:
+            total = Path(file).stat().st_size
+        except PermissionError:
+            return 0
+        return total
+    def getSizeFormat(self, b, factor=1024, suffix="B"):
+        for unit in [ "", "K", "M", "G", "T", "P", "E", "Z"]:
+            if b < factor:
+                return f"{b:.2f}-{unit}{suffix}"
+            b /= factor
+        return f"{b:.2f}-{suffix}"
+        
+    
 
 app = QApplication(sys.argv)
 w = MainWindow()
