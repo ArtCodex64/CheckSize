@@ -33,4 +33,4 @@ class HiloGetSizeFile(Thread):
         self.total = 0
 
     def run(self):
-        self.total = Path(r"%s" % file).stat().st_size
+        self.total = Path(r"%s" % self.file).stat().st_size

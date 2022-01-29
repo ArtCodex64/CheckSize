@@ -3,17 +3,19 @@ import subprocess
 import os
 import re
 import math
+import ctypes
 import threading
 import pandas as pd
 from pathlib import Path
 from os.path import join, getsize, abspath
 from os import scandir
 from PyQt5.QtWidgets import (
-    QMainWindow, QApplication, QWidget, 
-    QLabel, QStatusBar, QPushButton, QGridLayout, QAction,
-    QTableView, QHeaderView,
-    QHBoxLayout, QVBoxLayout, QScrollArea
+    QMainWindow, QApplication, QWidget, QLineEdit,
+    QStatusBar, QPushButton, QGridLayout, QAction,
+    QTableView, QHeaderView, QDialogButtonBox,
+    QHBoxLayout, QVBoxLayout, QScrollArea, QLabel
 )
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QPalette
 from modules.pandasModel import pandasModel
 from modules.hilos import HiloGetSizeDirs, HiloGetSizeFile
@@ -25,7 +27,6 @@ class MainWindow(QMainWindow):
         self.scrollArea.setBackgroundRole(QPalette.Dark)
         self.setWindowTitle("Check Size")
         self.setWindowIcon(QIcon("icons/py-file-icon.png"))
-
         button_units = QAction(QIcon("icons/storage-device.png"), "&Unidades", self)
         button_units.setStatusTip("Listar unidades de almacenamiento")
         button_units.triggered.connect(self.unidadesLogicas)
@@ -82,6 +83,7 @@ class MainWindow(QMainWindow):
             unidad = storage.split(" ")
 
         window.setLayout(layoutUnits)
+        self.scrollArea.setAlignment(Qt.AlignLeft)
         self.scrollArea.setWidget(window)
         self.setCentralWidget(self.scrollArea)
 
@@ -90,6 +92,7 @@ class MainWindow(QMainWindow):
         windowDF = QWidget()
         layoutUnitsDF = QVBoxLayout()
         layoutUnitsH = QHBoxLayout()
+        widthWin = self.windowSizeWidth()
         dirs = self.lsDirsFiles(pathDF)
         numDirs = 0
         numFiles = 0
@@ -169,6 +172,7 @@ class MainWindow(QMainWindow):
 
         
         windowDF.setLayout(layoutUnitsDF)
+        windowDF.setMinimumWidth(int(widthWin * 0.75))
         self.scrollArea.setWidget(windowDF)
         self.setCentralWidget(self.scrollArea)
     
@@ -186,30 +190,81 @@ class MainWindow(QMainWindow):
         info = "Espacio utilizado: %.2f" % txt + " GB | "
         info = info + "Tamaño unidad: %.2f" % tmUni + " GB | "
         info = info + "Espacio libre: %.2f" % tmLibf + " GB "
-        label = QLabel(info)
-        label.setStyleSheet(
-            "color:  #9fef00; " +
-            "font-size: 12px; " +
-            "width: 100%; " +
-            "height: auto; "
+        
+        lineE = QLineEdit()
+        lineE.setStyleSheet(
+            "height: 18px;" +
+            "background-color: #ffffff;" + 
+            "color: #000000; "
         )
+        buttonS = QPushButton("Buscar")
+        buttonS.setStyleSheet(
+            "height: 18px;" +
+            "background-color: #5985cb;" + 
+            "color: white; " 
+        )
+        buttonD = QPushButton("Borrar")
+        buttonD.setStyleSheet(
+            "height: 18px;" +
+            "background-color: #ff0008;" + 
+            "color: white; " 
+        )
+
         dirs, ndirs = self.getSize(unidad)
         df = pd.DataFrame(dirs, columns = ['DIR', 'SIZE(Bytes)','NUMBER OF FILES'])
         dfSort = df.sort_values(by=['SIZE(Bytes)'], ascending=False)
         model = pandasModel(dfSort)
         view = QTableView()
-        view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        ancho = self.windowSizeWidth()
+        alto = self.windowSizeHeight()
         view.setModel(model)
+        view.setMinimumWidth(ancho - 125)
+        view.setMinimumHeight(alto - 400)
+        view.setColumnWidth(0, int((ancho / 2)))
+        view.setColumnWidth(1, int((ancho / 4)))
+        header = view.horizontalHeader()
+        header.setStyleSheet(
+            "::section{ " +
+            "background-color: #9b2f4d;" +
+            "color: #ffffff; }"
+        )
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setStretchLastSection(True)
         view.setStyleSheet(
-            "background-color: #ffffff;"+
-            "color: #000000; "
+            "*{background-color: #ffffff;"+
+            "color: #000000; }"
         )
         window = QWidget()
-        layout = QGridLayout()
-        layout.addWidget(label, 0, 0)
-        layout.addWidget(view, 1, 0)
+        layout = QVBoxLayout()
+        layoutHSD = QHBoxLayout()
+        labelInfo = QLabel(info)
+        labelInfo.setStyleSheet(
+            "{ color: green; }"
+        )
+        layoutHSD.addWidget(lineE)
+        layoutHSD.addWidget(buttonS)
+        layoutHSD.addWidget(buttonD)
+        labelInfo.setAutoFillBackground(True)
+        layout.addWidget(labelInfo)
+        layout.addLayout(layoutHSD)
+        layout.addWidget(view)
         window.setLayout(layout)
-        self.setCentralWidget(window)
+        self.scrollArea.setAlignment(Qt.AlignCenter)
+        self.scrollArea.setWidget(window)
+        self.setCentralWidget(self.scrollArea)
+
+    def windowSizeWidth(self):
+        user32 = ctypes.windll.user32
+        user32.SetProcessDPIAware()
+        ancho = user32.GetSystemMetrics(0)
+        return ancho
+
+    def windowSizeHeight(self):
+        user32 = ctypes.windll.user32
+        user32.SetProcessDPIAware()
+        alto = user32.GetSystemMetrics(1)
+        return alto
+
 
     def lsDirsFiles(self, ruta):
         return [abspath(arch.path) for arch in scandir(ruta) if arch.is_file() or arch.is_dir()]
