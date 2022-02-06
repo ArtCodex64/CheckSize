@@ -7,31 +7,42 @@ import ctypes
 import threading
 import pandas as pd
 import shutil
+import time
 from pathlib import Path
 from os.path import join, getsize, abspath
 from os import scandir
 from PyQt5.QtWidgets import (
     QMainWindow, QApplication, QWidget, QLineEdit,
-    QStatusBar, QPushButton, QGridLayout, QAction,
-    QTableView, QHeaderView, QDialogButtonBox,
+    QStatusBar, QPushButton, QGridLayout, QAction, QProgressBar,
+    QTableView, QHeaderView, QDialogButtonBox, QComboBox,
     QHBoxLayout, QVBoxLayout, QScrollArea, QLabel, QMessageBox
 )
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon, QPalette
+from PyQt5.QtGui import QIcon, QPalette, QFont
 from modules.pandasModel import pandasModel
-from modules.hilos import HiloGetSizeDirs, HiloGetSizeFile
 from modules.extraerUR import extractU
+from tqdm.auto import tqdm
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
         self.scrollArea = QScrollArea()
+        self.layoutVProgressBar = QVBoxLayout()
         self.scrollArea.setBackgroundRole(QPalette.Dark)
         self.CURRENT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
         self.setWindowTitle("Check Size")
         self.setWindowIcon(QIcon(os.path.join(self.CURRENT_DIRECTORY, "icons/py-file-icon.png")))
         self.directorio_anterior = "Y:/"
+        self.pbar = QProgressBar()
+        self.pbar.setGeometry(0,0, self.windowSizeWidth(), 40)
+        self.pbar.setAlignment(Qt.AlignCenter)
+        self.filtroS = 0
+        self.filtroEx = ""
+        self.operacion = 0
+        self.unidadInfoMostrar = ""
+        self.unidadIN = ""
+        self.progressBar = QLabel("0%")
         button_units = QAction(QIcon("%s/icons/storage-device.png" % self.CURRENT_DIRECTORY ), "&Unidades", self)
         button_units.setStatusTip("Listar unidades de almacenamiento")
         button_units.triggered.connect(self.unidadesLogicas)
@@ -44,17 +55,25 @@ class MainWindow(QMainWindow):
             "color: #000000;"
         )
         
-
+        self.layoutVProgressBar.addWidget(self.pbar)
         lsUnits = menu.addMenu("&Archivos")
         lsUnits.addAction(button_units)
-        self.resize(1020, 600)
         self.showMaximized()
 
     def unidadesLogicas(self):
         
         window = QWidget()
+        layoutGeneral = QVBoxLayout()
         layoutUnits = QGridLayout()
+        self.pbar.setGeometry(0,0, self.windowSizeWidth(), 40)
+        self.pbar.setAlignment(Qt.AlignCenter)
+        layoutGeneral.addLayout(self.layoutVProgressBar)
+
         if 'win' in sys.platform:
+            self.subx = extractU()
+
+            unidades,rutas = self.subx.extraer()
+
             storage = subprocess.getoutput('fsutil fsinfo drives')
             unidades = storage.split(" ")
             unidades.pop(0)
@@ -63,14 +82,22 @@ class MainWindow(QMainWindow):
             num = math.ceil(len(unidades)/ 5)
             e = 0
             i = 0
-
+            o = 0
+            rutasUNI = []
             for x in unidades:
-                uniGood = x.replace('\\',"/")
-                buttonUn = QPushButton(QIcon("%s/icons/storage-device.png"  % self.CURRENT_DIRECTORY ), uniGood)
+                #uniGood = x + "/"
+                uniGood = x
+                #ruta = rutas[o].replace("\\", "")
+                #rutaMos = uniGood + " " + ruta
+                rutaMos = uniGood
+                buttonUn = QPushButton(QIcon("%s/icons/storage-device.png"  % self.CURRENT_DIRECTORY ), rutaMos)
+                rutasUNI.append(rutaMos)
+                o += 1
                 buttonUn.setStyleSheet(
                     "*{" + 
                     "padding: 5px 12px;" + 
-                    "background-color: #9fef00;" + 
+                    "background-color: #9fef00;" +
+                    "text-align: left; " +
                     "color: #000000;}" +
                     "*:hover{" +
                     "background-color: #dcff97;" + 
@@ -82,12 +109,14 @@ class MainWindow(QMainWindow):
                 if(i == 7):
                     e += 1
                     i = 0
+            self.unidadInfoMostrar = rutasUNI
 
         elif 'linux' in sys.platform:
             storage = subprocess.getoutput('df -h')
             unidad = storage.split(" ")
-
-        window.setLayout(layoutUnits)
+        
+        layoutGeneral.addLayout(layoutUnits)
+        window.setLayout(layoutGeneral)
         self.scrollArea.setAlignment(Qt.AlignLeft)
         self.scrollArea.setWidget(window)
         self.setCentralWidget(self.scrollArea)
@@ -97,7 +126,30 @@ class MainWindow(QMainWindow):
         layoutUnitsDF = QVBoxLayout()
         layoutUnitsV = QVBoxLayout()
         layoutUnitsH = QHBoxLayout()
+        layoutUnitsHUIC = QHBoxLayout()
         layoutUnitsInfo = QHBoxLayout()
+        for x in range(len(self.unidadInfoMostrar)):
+            if pathDF in self.unidadInfoMostrar[x]:
+                self.unidadIN = self.unidadInfoMostrar[x]
+
+        z = slice(0,2)
+        unidadL = self.unidadIN[z]
+        widthWin = self.windowSizeWidth()
+        labelUIF = QPushButton(self.unidadIN)
+        labelUIF.clicked.connect(lambda _, x=unidadL: self.showDF(x))
+        labelUIF.setMinimumWidth(500)
+        labelUIF.setMinimumHeight(34)
+        labelUIF.setStyleSheet(
+            "*{" +
+            "background-color: #8ec641;" +
+            "color: #111927;" +
+            "font-weight: bold;" +
+            "font-size: 18px;" +
+            "text-align: left; " +
+            "padding-left: 7px; "
+            "}"
+        )
+        
         inicioBtn = QPushButton(QIcon("%s/icons/storage-device.png" % self.CURRENT_DIRECTORY ), "")
         inicioBtn.setMaximumWidth(50)
         inicioBtn.setMaximumHeight(50)
@@ -120,7 +172,6 @@ class MainWindow(QMainWindow):
         )
         atrasBtn.clicked.connect(lambda _, x=pathDF: self.volverAtras(x))
         layoutUnitsInfo.addWidget(atrasBtn)
-        widthWin = self.windowSizeWidth()
         info = ""
         
         if len(pathDF) == 3:
@@ -144,7 +195,7 @@ class MainWindow(QMainWindow):
                 numFiles += 1
         buttonCalculate = QPushButton(QIcon("%s/icons/calculator.png"  % self.CURRENT_DIRECTORY ), "Calcular")
         buttonCalculate.setMaximumWidth(200)
-        buttonCalculate.setMaximumHeight(50)
+        buttonCalculate.setMaximumHeight(34)
         buttonCalculate.setStyleSheet(
                     "*{" + 
                     "padding: 5px 12px;" + 
@@ -157,16 +208,32 @@ class MainWindow(QMainWindow):
                     "}"
                 )
         buttonCalculate.clicked.connect(lambda _, pathDF=pathDF: self.infoUnidades(pathDF))
-        layoutUnitsDF.addWidget(buttonCalculate)
+        layoutUnitsHUIC.setAlignment(Qt.AlignLeft)
+        layoutUnitsHUIC.addWidget(labelUIF)
+        layoutUnitsHUIC.addWidget(buttonCalculate)
+        
 
         arrayDirs = []
         arrayFiles = []
-        for x in dirs:
-            if os.path.isdir(x):
-                sizeDir = self.getSizeDirs(x)
+        sizeDirsTqdm = len(dirs)
+        text = " "
+        u = 0
+        uu = 0
+        if len(dirs) < 101:
+            porcent = 101/len(dirs)
+            porcent = math.floor(porcent)
+        for x in range(101):
+            time.sleep(0.05)
+            self.pbar.setValue(x*porcent)
+
+            if x == len(dirs):
+                break
+
+            if os.path.isdir(dirs[x]):
+                sizeDir = self.getSizeDirs(dirs[x])
                 sizeFormat = self.getSizeFormat(sizeDir)
                 label = QLabel(sizeFormat)
-                buttonUn = QPushButton(QIcon("%s/icons/folder-red.png" % self.CURRENT_DIRECTORY ), x)
+                buttonUn = QPushButton(QIcon("%s/icons/folder-red.png" % self.CURRENT_DIRECTORY ), dirs[x])
                 buttonUn.setStyleSheet(
                     "*{" + 
                     "padding: 5px 12px;" + 
@@ -178,13 +245,14 @@ class MainWindow(QMainWindow):
                     "color: #000000;" +
                     "}"
                 )
-                buttonUn.clicked.connect(lambda _, x=x:self.showDF(x))
+                buttonUn.clicked.connect(lambda _, x=x:self.showDF(dirs[x]))
                 arrayDirs.append([buttonUn, label])
-            elif os.path.isfile(x):
-                sizeFile = self.getSizeFile(x)
+                
+            elif os.path.isfile(dirs[x]):
+                sizeFile = self.getSizeFile(dirs[x])
                 sizeFormat = self.getSizeFormat(sizeFile)
                 label = QLabel(str(sizeFormat))
-                buttonUn = QPushButton(QIcon("%s/icons/file-red.png" % self.CURRENT_DIRECTORY ), x)
+                buttonUn = QPushButton(QIcon("%s/icons/file-red.png" % self.CURRENT_DIRECTORY ), dirs[x])
                 buttonUn.setStyleSheet(
                     "*{" + 
                     "padding: 5px 12px;" + 
@@ -209,8 +277,12 @@ class MainWindow(QMainWindow):
             layoutUnitsH.addWidget(x[0])
             layoutUnitsH.addWidget(x[1])
             layoutUnitsDF.addLayout(layoutUnitsH)
+        
+        self.pbar.setValue(0)
 
+        layoutUnitsV.addWidget(self.pbar)
         layoutUnitsV.addLayout(layoutUnitsInfo)
+        layoutUnitsV.addLayout(layoutUnitsHUIC)
         layoutUnitsV.addLayout(layoutUnitsDF)
         windowDF.setLayout(layoutUnitsV)
         windowDF.setMinimumWidth(int(widthWin * 0.75))
@@ -219,6 +291,49 @@ class MainWindow(QMainWindow):
         self.scrollArea.setAlignment(Qt.AlignLeft)
     
     def infoUnidades(self, unidad):
+        tam = QLabel("Seleccionar tamaño:")
+        self.comboBoxSize = QComboBox()
+        self.comboBoxSize.setStyleSheet(
+            "QComboBox"
+             "{"
+             "width: 50px;"
+             "background-color: white;"
+             "color: black;"
+             "}"
+             "QListView"
+             "{"
+             "width: 50px;"
+             "background-color: white;"
+             "color: black;"
+             "}"
+             )
+        listaSize = ["---", "KB", "MB", "GB"]
+        self.comboBoxSize.addItems(listaSize)
+        ext = QLabel("Seleccionar extensión:")
+        self.comboBoxEx = QComboBox()
+        self.comboBoxEx.setStyleSheet(
+            "QComboBox"
+             "{"
+             "width: 50px;"
+             "background-color: white;"
+             "color: black;"
+             "}"
+             "QListView"
+             "{"
+             "width: 50px;"
+             "background-color: white;"
+             "color: black;"
+             "}"
+             )
+        listaEx = ["---","JPG","JPEG","PNG","PDF","TXT","TIFF"]
+        self.comboBoxEx.addItems(listaEx)
+
+        layoutDescripcion = QHBoxLayout()
+        textoBD = "Buscar: <ruta> \nFiltrar por tamaño [Bytes]: <ruta> +++<bytes> \nFiltrar por extensión: <ruta> ex=<.jpg .jpeg .png .tiff .pdf .txt>\n"
+        textoQLabel = QLabel(textoBD)
+        textoQLabel.setFont(QFont('Roboto', 10))
+        layoutDescripcion.addWidget(textoQLabel)
+        descripcion = QLabel(textoBD)
         inicioBtn = QPushButton(QIcon("%s/icons/storage-device.png" % self.CURRENT_DIRECTORY ), "")
         inicioBtn.setMaximumWidth(50)
         inicioBtn.setMaximumHeight(50)
@@ -239,14 +354,18 @@ class MainWindow(QMainWindow):
             "}"
         )
         atrasBtn.clicked.connect(lambda _, x=unidad: self.volverAtras(x))
-        info = subprocess.getoutput('fsutil volume diskfree %s' % unidad)
+        #info = subprocess.getoutput('fsutil volume diskfree %s' % unidad)
+        info = ""
         
         self.lineE = QLineEdit()
         self.lineE.setPlaceholderText("Introduce la ruta ...")
         self.lineE.setStyleSheet(
+            "text-indent: 7px;" +
             "height: 18px;" +
             "background-color: #ffffff;" + 
-            "color: #000000; "
+            "color: #000000; " +
+            "font-family: Roboto; " +
+            "font-size: 12px"
         )
         buttonS = QPushButton("Buscar")
         
@@ -265,10 +384,11 @@ class MainWindow(QMainWindow):
         )
 
         dirs, files = self.getSize(unidad)
-        df = pd.DataFrame(dirs, columns = ['DIR', 'SIZE','NUMBER OF FILES'])
-        dfSort = df.sort_values(by=['SIZE'], ascending=False)
-        dfi = pd.DataFrame(files, columns = ['FILES', 'SIZE','NUMBER OF FILES'])
-        dfiSort = dfi.sort_values(by=['SIZE'], ascending=False)
+        df = pd.DataFrame(dirs, columns = ['DIR', 'SIZE[Bytes]','NUMBER OF FILES'])
+        dfSort = df.sort_values(by=['SIZE[Bytes]'], ascending=False)
+        dfi = pd.DataFrame(files, columns = ['FILES', 'SIZE[Bytes]','NUMBER OF FILES'])
+        dfiSort = dfi.sort_values(by=['SIZE[Bytes]'], ascending=False)
+
         self.model = pandasModel(dfSort)
         self.modelF = pandasModel(dfiSort)
         #
@@ -321,12 +441,14 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
         layoutHSD = QHBoxLayout()
         labelInfo = QLabel(info)
-        labelInfo.setStyleSheet(
-            "{ color: green; }"
-        )
+        layout.addLayout(layoutDescripcion)
         layoutHSD.addWidget(inicioBtn)
         layoutHSD.addWidget(atrasBtn)
         layoutHSD.addWidget(self.lineE)
+        layoutHSD.addWidget(tam)
+        layoutHSD.addWidget(self.comboBoxSize)
+        layoutHSD.addWidget(ext)
+        layoutHSD.addWidget(self.comboBoxEx)
         layoutHSD.addWidget(buttonS)
         layoutHSD.addWidget(buttonD)
         labelInfo.setAutoFillBackground(True)
@@ -369,34 +491,62 @@ class MainWindow(QMainWindow):
         data = []
         dataF = []
         numDirs = 0
+        count = 0
+        numFiles = 0
+        sizes = 0
+        e = 0
         for root, dirs, files in os.walk(start_path):
             dirs = root
-            sizes = sum(getsize(join(root, name)) for name in files)
-            sizeFormat = self.getSizeFormat(sizes)
-            numFiles = len(files)
-            data += [[dirs, sizeFormat, numFiles]]
+            extensions = [self.filtroEx]
+            if self.filtroEx == "":
+                sizes = sum(self.getSizeDirs(join(root, name)) for name in files)
+            else:
+                filesWO = [file for file in files if os.path.splitext(file)[1] in extensions]
+                sizes = sum(self.getSizeDirs(join(root, name)) for name in filesWO)
+            for file in files:
+                if self.filtroEx in file:
+                    numFiles += 1
+            data += [[dirs, sizes, numFiles]]
             numDirs += 1
         e = 0
+
         files = self.lsFiles(start_path)
         for file in files:
-            if file:
-                sizes = Path(file).stat().st_size
-                sizeFormat = self.getSizeFormat(sizes)
-                numFiles = 1
-                dataF += [[ file, sizeFormat, numFiles]]
-            else:
-                dataF = [["Nulo","0","0"]]
+                if self.filtroEx in file:
+                    sizes = Path(file).stat().st_size
+                    #sizeFormat = self.getSizeFormat(sizes)
+                    numFiles = 1
+                    if sizes >= self.filtroS:
+                        dataF += [[ file, sizes, numFiles]]
 
         return data, dataF
 
     def getSizeDirs(self, directory):
         total = 0
+        totalF = 0
         try:
             for entry in os.scandir(directory):
-                if entry.is_file():
-                    total += entry.stat().st_size
-                elif entry.is_dir():
-                    total += self.getSizeDirs(entry.path)
+                if self.filtroEx == "":
+                    if entry.is_file():
+                        total = total + entry.stat().st_size
+                    elif entry.is_dir():
+                        total = total + self.getSizeDirs(entry.path)
+                elif self.filtroEx != "" and self.filtroS != 0:
+                    if entry.is_file():
+                        nombre = entry.path
+                        if self.filtroEx in nombre:
+                            totalF = totalF + entry.stat().st_size
+                            if totalF > self.filtroS:
+                                total = tofalF
+                    elif entry.is_dir():
+                        total = total + self.getSizeDirs(entry.path)
+                else:
+                    if entry.is_file():
+                        nombre = entry.path
+                        if self.filtroEx in nombre:
+                            total = total + entry.stat().st_size
+                    elif entry.is_dir():
+                        total = total + self.getSizeDirs(entry.path)
         except NotADirectoryError:
             return os.path.getsize(directory)
         except PermissionError:
@@ -417,7 +567,38 @@ class MainWindow(QMainWindow):
         return f"{b:.2f}-{suffix}"
     def valorQLineEdit(self):
         texto = self.lineE.text().strip()
-        self.showDF(texto)
+        if self.comboBoxSize.currentIndex() == 0:
+            self.filtroS = 0
+        elif self.comboBoxSize.currentIndex() == 1:
+            self.filtroS = 1024
+        elif self.comboBoxSize.currentIndex() == 2:
+            self.filtroS = 1024**2
+        elif self.comboBoxSize.currentIndex() == 3:
+            self.filtroS = 1024**3
+        elif self.comboBoxSize.currentIndex() == 4:
+            self.filtroS = 1024**4
+
+        if self.comboBoxEx.currentIndex() == 0:
+            self.filtroEx = ""
+        elif self.comboBoxEx.currentIndex() == 1:
+            self.filtroEx = ".jpg"
+        elif self.comboBoxEx.currentIndex() == 2:
+            self.filtroEx = ".jpeg"
+        elif self.comboBoxEx.currentIndex() == 3:
+            self.filtroEx = ".png"
+        elif self.comboBoxEx.currentIndex() == 4:
+            self.filtroEx = ".pdf"
+        elif self.comboBoxEx.currentIndex() == 5:
+            self.filtroEx = ".txt"
+        elif self.comboBoxEx.currentIndex() == 6:
+            self.filtroEx = ".tiff"
+            
+        if self.comboBoxSize.currentIndex() == 0 and self.comboBoxEx.currentIndex() == 0:
+            self.filtroS = 0
+            self.filtroEx = ""
+            self.showDF(texto)
+        else:
+            self.infoUnidades(texto)
     
     @QtCore.pyqtSlot()
     def on_selec_change(self):
@@ -479,6 +660,7 @@ class MainWindow(QMainWindow):
                 self.infoUnidades(DFSs)
                 
     def volver(self, path):
+        self.filtro = 0
         self.showDF(path)
 
     def is_admin(self):
@@ -487,6 +669,7 @@ class MainWindow(QMainWindow):
         except:
             return False
     def volverAtras(self, path):
+        self.filtro = 0
         if len(path) == 3:
             self.unidadesLogicas()
         else:
@@ -500,8 +683,9 @@ class MainWindow(QMainWindow):
             
                 if path[len(path)-1] != "/":
                     directorios.pop(-1)
+                else:
+                    directorios.pop(-1)
 
-                directorios.pop(-1)
                 txtDirec = ""
                 for i in range(len(directorios)):
                         txtDirec += directorios[i]+"/"

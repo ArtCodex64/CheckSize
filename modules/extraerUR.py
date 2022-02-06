@@ -6,6 +6,9 @@ class extractU():
         super().__init__()
     
     def extraer(self):
+        net = []
         netUS = subprocess.getoutput('net use')
-        sp = re.search('CENTCS01SRV05(.+D?)Micro', netUS).group(1)
-        return sp
+        netUSl = re.findall('[A-Z]{1}[:]{1}', netUS)
+        netUSr = re.findall('\\b\\\\\w+\w+\\b', netUS)
+
+        return netUSl,netUSr
