@@ -30,15 +30,40 @@
 #  Librerias y módulos  #
 # --------------------- #
 #   Importamos las librerias y módulos necesarios para el correcto funcionamiento del programa en Python
+import sys, time
+import subprocess
+import os
+import re
+import math
+import ctypes
+import threading
+import pandas as pd
+import shutil
+import time
+from pathlib import Path
+from os.path import join, getsize, abspath
+from os import scandir
+#PYQT5 - ELEMENTOS GRÁFICOS
+from PyQt5.QtWidgets import (
+    QMainWindow, QApplication, QWidget, QLineEdit,
+    QStatusBar, QPushButton, QGridLayout, QAction, QProgressBar,
+    QTableView, QHeaderView, QDialogButtonBox, QComboBox,
+    QHBoxLayout, QVBoxLayout, QScrollArea, QLabel, QMessageBox
+)
+from PyQt5 import QtCore
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon, QPalette, QFont
 
-# Con este archivo generamos el ejecutable
-from distutils.core import setup
-import py2exe
-import sys
-includes = ["encodings", "encodings.*"]  
-sys.argv.append("py2exe")
-options = {"py2exe":   { "bundle_files": 1 }  
-                } 
-setup(options = options,
-	  zipfile=None, 
-	  console = [{"script":'Y:\CheckSizeApp\\app.py'}])
+#CLASE FORMAT
+class Format():
+    def __init__(self):
+        super(Format, self).__init__()
+    #Función GETSIZEFORMAT
+    #Le pasamos un parámetro en BYTES y nos devuelve su unidad más alta con 2 decimales
+    def getSizeFormat(self, b, factor=1024, suffix="B"):
+            for unit in [ "", "K", "M", "G", "T", "P", "E", "Z"]:
+                if b < factor:
+                    return f"{b:.2f}-{unit}{suffix}"
+                b /= factor
+            #Retorna el valor de la función GETSIZEFORMAT
+            return f"{b:.2f}-{suffix}"

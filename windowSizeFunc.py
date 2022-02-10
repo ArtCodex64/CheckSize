@@ -30,15 +30,45 @@
 #  Librerias y módulos  #
 # --------------------- #
 #   Importamos las librerias y módulos necesarios para el correcto funcionamiento del programa en Python
-
-# Con este archivo generamos el ejecutable
-from distutils.core import setup
-import py2exe
-import sys
-includes = ["encodings", "encodings.*"]  
-sys.argv.append("py2exe")
-options = {"py2exe":   { "bundle_files": 1 }  
-                } 
-setup(options = options,
-	  zipfile=None, 
-	  console = [{"script":'Y:\CheckSizeApp\\app.py'}])
+import sys, time
+import subprocess
+import os
+import re
+import math
+import ctypes
+import threading
+import pandas as pd
+import shutil
+import time
+from pathlib import Path
+from os.path import join, getsize, abspath
+from os import scandir
+# PYQT5 - Elementos gráficos
+from PyQt5.QtWidgets import (
+    QMainWindow, QApplication, QWidget, QLineEdit,
+    QStatusBar, QPushButton, QGridLayout, QAction, QProgressBar,
+    QTableView, QHeaderView, QDialogButtonBox, QComboBox,
+    QHBoxLayout, QVBoxLayout, QScrollArea, QLabel, QMessageBox
+)
+from PyQt5 import QtCore
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon, QPalette, QFont
+# Clase WINDOWSIZEFUNC
+#  Sirve para obtener el ancho y el alto de la pantalla
+class WindowSizeFunc():
+    def __init__(self):
+        super(WindowSizeFunc, self).__init__()
+    # Función WINDOWSIZEWIDTH
+    #  Nos devuelve el ancho de la pantalla
+    def windowSizeWidth(self):
+        user32 = ctypes.windll.user32
+        user32.SetProcessDPIAware()
+        ancho = user32.GetSystemMetrics(0)
+        return ancho
+    # Función WINDOWSIZEHEIGHT
+    #  Nos devuelve el alto de la pantalla
+    def windowSizeHeight(self):
+        user32 = ctypes.windll.user32
+        user32.SetProcessDPIAware()
+        alto = user32.GetSystemMetrics(1)
+        return alto

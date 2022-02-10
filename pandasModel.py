@@ -31,14 +31,27 @@
 # --------------------- #
 #   Importamos las librerias y módulos necesarios para el correcto funcionamiento del programa en Python
 
-# Con este archivo generamos el ejecutable
-from distutils.core import setup
-import py2exe
-import sys
-includes = ["encodings", "encodings.*"]  
-sys.argv.append("py2exe")
-options = {"py2exe":   { "bundle_files": 1 }  
-                } 
-setup(options = options,
-	  zipfile=None, 
-	  console = [{"script":'Y:\CheckSizeApp\\app.py'}])
+from PyQt5.QtCore import QAbstractTableModel, Qt
+
+class pandasM(QAbstractTableModel):
+    def __init__(self, data):
+        super(pandasM, self).__init__()
+        self._data = data
+    
+    def rowCount(self, data):
+        return self._data.shape[0]
+
+    def columnCount(self, data):
+        return self._data.shape[1]
+
+    def data(self, index, role=Qt.DisplayRole):
+        if index.isValid():
+            if role == Qt.DisplayRole:
+                return str(self._data.iloc[index.row(), index.column()])
+        return None
+    
+    def headerData(self, col, orientation, role):
+        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+            self._data.columns[col]
+            return self._data.columns[col]
+        return None
